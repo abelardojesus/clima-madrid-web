@@ -174,7 +174,7 @@ function markUpdated() {
     minute: "2-digit",
   });
   document.getElementById("last-updated").textContent =
-    `Última actualización: ${timeFormatter.format(new Date())}`;
+    `🕒 Última actualización: ${timeFormatter.format(new Date())}`;
 }
 
 async function refreshAll() {

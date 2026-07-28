@@ -40,9 +40,16 @@ body {
   font-size: 28px;
 }
 
-.last-updated {
+.update-badge {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 8px 14px;
   font-size: 13px;
-  margin-top: 4px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .muted {
