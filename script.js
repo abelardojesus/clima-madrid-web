@@ -165,6 +165,29 @@ async function loadNews() {
   }
 }
 
-renderHeader();
-loadWeather();
-loadNews();
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+function markUpdated() {
+  const timeFormatter = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  document.getElementById("last-updated").textContent =
+    `Última actualización: ${timeFormatter.format(new Date())}`;
+}
+
+async function refreshAll() {
+  renderHeader();
+  await Promise.all([loadWeather(), loadNews()]);
+  markUpdated();
+}
+
+refreshAll();
+setInterval(refreshAll, REFRESH_INTERVAL_MS);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    refreshAll();
+  }
+});

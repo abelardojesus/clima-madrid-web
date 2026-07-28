@@ -40,6 +40,11 @@ body {
   font-size: 28px;
 }
 
+.last-updated {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
 .muted {
   color: var(--text-muted);
   margin: 0;
