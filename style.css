@@ -4,10 +4,7 @@
   --border: #e2e6f0;
   --text: #1c2740;
   --text-muted: #667085;
-  --accent: #f0955a;
-  --wa-green: #1da851;
-  --wa-green-bg: #e7f7ec;
-  --wa-green-border: #b8e6c5;
+  --accent: #1da851;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,10 +14,7 @@
     --border: #2a3550;
     --text: #edf0f7;
     --text-muted: #97a2bd;
-    --accent: #ffb877;
-    --wa-green: #25d366;
-    --wa-green-bg: #10241a;
-    --wa-green-border: #1f4d34;
+    --accent: #25d366;
   }
 }
 
@@ -52,9 +46,9 @@ body {
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--wa-green);
-  background: var(--wa-green-bg);
-  border: 1px solid var(--wa-green-border);
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
