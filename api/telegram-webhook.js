@@ -41,8 +41,10 @@ export default async function handler(req, res) {
   try {
     const madrid = nowInMadridParts();
     const climaMessage = await buildClimaMessage(madrid);
-    await sendTelegramMessage(token, chatId, climaMessage);
-    res.status(200).json({ ok: true, sent: true });
+    for (const id of allowedChatIds) {
+      await sendTelegramMessage(token, id, climaMessage);
+    }
+    res.status(200).json({ ok: true, sent: true, chatIds: allowedChatIds });
   } catch (error) {
     res.status(200).json({ ok: true, sent: false, error: String(error) });
   }
