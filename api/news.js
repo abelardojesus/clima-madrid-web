@@ -43,6 +43,27 @@ function extractImage(entry) {
   return null;
 }
 
+async function fetchOgImage(link) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(link, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ClimaMadridBot/1.0)" },
+    });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const html = await response.text();
+    const match =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+    return match ? match[1] : null;
+  } catch (error) {
+    return null;
+  }
+}
+
 async function fetchCategory(sources) {
   const items = [];
   for (const { name, url } of sources) {
@@ -78,6 +99,15 @@ export default async function handler(req, res) {
   categories.forEach((category, i) => {
     news[category] = results[i];
   });
+
+  const missingImage = Object.values(news)
+    .flat()
+    .filter((item) => !item.image && item.link);
+  await Promise.all(
+    missingImage.map(async (item) => {
+      item.image = await fetchOgImage(item.link);
+    })
+  );
 
   res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
   res.status(200).json(news);
