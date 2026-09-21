@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 
 const NEWS_FEEDS = {
   "Venezuela": [
-    { name: "El Nacional", url: "https://www.elnacional.com/feed/" },
+    { name: "Crónica Uno", url: "https://cronica.uno/feed/" },
     { name: "Efecto Cocuyo", url: "https://efectococuyo.com/feed/" },
   ],
   "España": [
