@@ -16,7 +16,32 @@ const NEWS_FEEDS = {
 };
 
 const PER_CATEGORY = 5;
-const parser = new Parser({ timeout: 8000 });
+const parser = new Parser({
+  timeout: 8000,
+  customFields: {
+    item: [
+      ["media:content", "mediaContent", { keepArray: true }],
+      ["media:thumbnail", "mediaThumbnail"],
+    ],
+  },
+});
+
+function extractImage(entry) {
+  if (entry.enclosure?.url && (entry.enclosure.type || "").startsWith("image")) {
+    return entry.enclosure.url;
+  }
+  const mediaContent = Array.isArray(entry.mediaContent) ? entry.mediaContent : [];
+  const fromMediaContent = mediaContent.find((m) => m?.$?.url)?.$?.url;
+  if (fromMediaContent) return fromMediaContent;
+
+  if (entry.mediaThumbnail?.$?.url) return entry.mediaThumbnail.$.url;
+
+  const html = entry["content:encoded"] || entry.content || entry.summary || "";
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (match) return match[1];
+
+  return null;
+}
 
 async function fetchCategory(sources) {
   const items = [];
@@ -28,7 +53,12 @@ async function fetchCategory(sources) {
         if (items.length >= PER_CATEGORY) break;
         const title = (entry.title || "").trim();
         if (title) {
-          items.push({ title, source: name, link: entry.link || null });
+          items.push({
+            title,
+            source: name,
+            link: entry.link || null,
+            image: extractImage(entry),
+          });
         }
       }
     } catch (error) {

@@ -127,14 +127,23 @@ function renderNews(news) {
 
     const itemsHtml = items.length
       ? items
-          .map(
-            (item, i) => `
-        <div class="news-item">
-          <span class="num">${i + 1}.</span>
-          ${item.link ? `<a href="${item.link}" target="_blank" rel="noopener">${item.title}</a>` : item.title}
-          <span class="source">📎 ${item.source}</span>
-        </div>`
-          )
+          .map((item, i) => {
+            const thumb = item.image
+              ? `<img class="news-thumb" src="${item.image}" alt="" loading="lazy" onerror="this.closest('.news-item').classList.add('no-image')">`
+              : "";
+            const titleHtml = item.link
+              ? `<a href="${item.link}" target="_blank" rel="noopener">${item.title}</a>`
+              : item.title;
+            return `
+        <div class="news-item${item.image ? "" : " no-image"}">
+          ${thumb}
+          <div class="news-body">
+            <span class="num">${i + 1}.</span>
+            ${titleHtml}
+            <span class="source">📎 ${item.source}</span>
+          </div>
+        </div>`;
+          })
           .join("")
       : `<p class="muted">Sin noticias disponibles ahora mismo</p>`;
 
