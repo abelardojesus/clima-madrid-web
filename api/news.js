@@ -64,26 +64,31 @@ async function fetchOgImage(link) {
   }
 }
 
-async function fetchCategory(sources) {
-  const items = [];
-  for (const { name, url } of sources) {
-    if (items.length >= PER_CATEGORY) break;
-    try {
-      const feed = await parser.parseURL(url);
-      for (const entry of feed.items) {
-        if (items.length >= PER_CATEGORY) break;
+async function fetchSource({ name, url }) {
+  try {
+    const feed = await parser.parseURL(url);
+    return feed.items
+      .map((entry) => {
         const title = (entry.title || "").trim();
-        if (title) {
-          items.push({
-            title,
-            source: name,
-            link: entry.link || null,
-            image: extractImage(entry),
-          });
-        }
-      }
-    } catch (error) {
-      continue;
+        if (!title) return null;
+        return { title, source: name, link: entry.link || null, image: extractImage(entry) };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    return [];
+  }
+}
+
+// Intercala las fuentes en vez de agotar la primera: así una fuente sin
+// imágenes en su feed (p. ej. bloqueada por Cloudflare al pedir la imagen
+// og:image) no acapara la categoría entera dejándola sin fotos.
+async function fetchCategory(sources) {
+  const perSource = await Promise.all(sources.map(fetchSource));
+  const items = [];
+  for (let i = 0; items.length < PER_CATEGORY && perSource.some((list) => i < list.length); i++) {
+    for (const list of perSource) {
+      if (items.length >= PER_CATEGORY) break;
+      if (list[i]) items.push(list[i]);
     }
   }
   return items;
