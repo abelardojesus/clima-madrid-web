@@ -15,6 +15,18 @@ const NEWS_FEEDS = {
   ],
 };
 
+// Fuente dedicada a industria y desarrollo militar (todo su contenido es
+// relevante). Las fuentes generalistas aportan la actualidad bélica
+// (Ucrania, Irán, etc.) pero se filtran por palabra clave para no mezclar
+// noticias ajenas al tablón.
+const WAR_PRIMARY_FEED = { name: "Infodefensa", url: "https://www.infodefensa.com/feed/all" };
+const WAR_FILTERED_FEEDS = [
+  { name: "ABC", url: "https://www.abc.es/rss/2.0/internacional/" },
+  { name: "BBC Mundo", url: "https://feeds.bbci.co.uk/mundo/rss.xml" },
+];
+const WAR_KEYWORDS =
+  /\b(guerra\w*|ucrania\w*|rusia\w*|ruso\w*|kremlin\w*|putin\w*|zelensk\w*|ir[aá]n\w*|israel\w*|gaza\w*|hamas\w*|hamás\w*|hezbol\w*|otan|nato|misil\w*|dron\w*|militar\w*|ej[eé]rcito\w*|tropas\w*|armamento\w*|defensa\w*|nuclear\w*|b[eé]lic\w*|ofensiva\w*|bombarde\w*|invasi[oó]n\w*)\b/i;
+
 const PER_CATEGORY = 5;
 const parser = new Parser({
   timeout: 8000,
@@ -82,11 +94,10 @@ async function fetchSource({ name, url }) {
 // Intercala las fuentes en vez de agotar la primera: así una fuente sin
 // imágenes en su feed (p. ej. bloqueada por Cloudflare al pedir la imagen
 // og:image) no acapara la categoría entera dejándola sin fotos.
-async function fetchCategory(sources) {
-  const perSource = await Promise.all(sources.map(fetchSource));
+function interleave(lists) {
   const items = [];
-  for (let i = 0; items.length < PER_CATEGORY && perSource.some((list) => i < list.length); i++) {
-    for (const list of perSource) {
+  for (let i = 0; items.length < PER_CATEGORY && lists.some((list) => i < list.length); i++) {
+    for (const list of lists) {
       if (items.length >= PER_CATEGORY) break;
       if (list[i]) items.push(list[i]);
     }
@@ -94,16 +105,32 @@ async function fetchCategory(sources) {
   return items;
 }
 
+async function fetchCategory(sources) {
+  const perSource = await Promise.all(sources.map(fetchSource));
+  return interleave(perSource);
+}
+
+async function fetchWarCategory() {
+  const [primary, ...filteredRaw] = await Promise.all([
+    fetchSource(WAR_PRIMARY_FEED),
+    ...WAR_FILTERED_FEEDS.map(fetchSource),
+  ]);
+  const filtered = filteredRaw.map((list) => list.filter((item) => WAR_KEYWORDS.test(item.title)));
+  return interleave([primary, ...filtered]);
+}
+
 export default async function handler(req, res) {
   const categories = Object.keys(NEWS_FEEDS);
-  const results = await Promise.all(
-    categories.map((category) => fetchCategory(NEWS_FEEDS[category]))
-  );
+  const results = await Promise.all([
+    ...categories.map((category) => fetchCategory(NEWS_FEEDS[category])),
+    fetchWarCategory(),
+  ]);
 
   const news = {};
   categories.forEach((category, i) => {
     news[category] = results[i];
   });
+  news["Guerra y Defensa"] = results[categories.length];
 
   const missingImage = Object.values(news)
     .flat()
