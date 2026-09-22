@@ -127,10 +127,10 @@ export default async function handler(req, res) {
   ]);
 
   const news = {};
+  news["Guerra y Defensa"] = results[categories.length];
   categories.forEach((category, i) => {
     news[category] = results[i];
   });
-  news["Guerra y Defensa"] = results[categories.length];
 
   const missingImage = Object.values(news)
     .flat()
