@@ -1,4 +1,4 @@
-import { nowInMadridParts, buildClimaMessage, sendTelegramMessage } from "../lib/clima.js";
+import { nowInMadridParts, buildClimaMessage, sendReplacingPrevious } from "../lib/clima.js";
 
 export default async function handler(req, res) {
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const madrid = nowInMadridParts();
     const climaMessage = await buildClimaMessage(madrid);
     for (const id of allowedChatIds) {
-      await sendTelegramMessage(token, id, climaMessage);
+      await sendReplacingPrevious(token, id, climaMessage);
     }
     res.status(200).json({ ok: true, sent: true, chatIds: allowedChatIds });
   } catch (error) {

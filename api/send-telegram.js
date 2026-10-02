@@ -1,4 +1,5 @@
-import { nowInMadridParts, buildClimaMessage, sendTelegramMessage } from "../lib/clima.js";
+import { nowInMadridParts, buildClimaMessage, sendReplacingPrevious, madridDateKey } from "../lib/clima.js";
+import { stateAvailable, getValue, setValue } from "../lib/state.js";
 
 const TARGET_HOUR_MADRID = 9;
 
@@ -34,14 +35,20 @@ export default async function handler(req, res) {
     return;
   }
 
+  const today = madridDateKey();
   try {
+    if (!force && stateAvailable() && (await getValue("last_sent_date")) === today) {
+      res.status(200).json({ sent: false, reason: `Ya se envió el mensaje hoy (${today})` });
+      return;
+    }
+
     const message = await buildClimaMessage(madrid);
     const results = [];
     for (const chatId of chatIds) {
-      await sendTelegramMessage(token, chatId, message);
-      results.push(chatId);
+      results.push(await sendReplacingPrevious(token, chatId, message));
     }
-    res.status(200).json({ sent: true, chatIds: results, madridTime: `${madrid.hour}:${madrid.minute}` });
+    if (!force && stateAvailable()) await setValue("last_sent_date", today);
+    res.status(200).json({ sent: true, results, madridTime: `${madrid.hour}:${madrid.minute}` });
   } catch (error) {
     res.status(502).json({ sent: false, error: String(error) });
   }
