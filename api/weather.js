@@ -1,20 +1,14 @@
-const MADRID_LAT = 40.4168;
-const MADRID_LON = -3.7038;
+import { fetchForecast } from "../lib/weather.js";
+
+const HOURS_PER_DAY = 24;
 
 export default async function handler(req, res) {
-  const url =
-    "https://api.open-meteo.com/v1/forecast" +
-    `?latitude=${MADRID_LAT}&longitude=${MADRID_LON}` +
-    "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code" +
-    "&daily=sunrise,sunset,precipitation_probability_max,temperature_2m_max,temperature_2m_min" +
-    "&timezone=Europe%2FMadrid";
-
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    if (!response.ok) {
-      throw new Error(`Open-Meteo respondió ${response.status}`);
+    const data = await fetchForecast();
+    // La previsión por horas cubre 7 días; la web solo necesita las de hoy.
+    if (data.hourly) {
+      for (const key of Object.keys(data.hourly)) data.hourly[key] = data.hourly[key].slice(0, HOURS_PER_DAY);
     }
-    const data = await response.json();
     res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=60");
     res.status(200).json(data);
   } catch (error) {

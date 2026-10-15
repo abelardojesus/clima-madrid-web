@@ -45,6 +45,7 @@ const els = {
   status: document.getElementById("status"),
   refresh: document.getElementById("refresh"),
   weather: document.getElementById("weather-card"),
+  week: document.getElementById("week-card"),
   news: document.getElementById("news"),
 };
 
@@ -65,6 +66,8 @@ const hourFormatter = new Intl.DateTimeFormat("es-ES", {
   hour: "numeric",
   hourCycle: "h23",
 });
+const weekdayFormatter = new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "short" });
+const mmFormatter = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
 const relativeFormatter = new Intl.RelativeTimeFormat("es", { numeric: "auto", style: "short" });
 
 // Construye nodos DOM sin innerHTML: los titulares y enlaces vienen de feeds externos.
@@ -100,6 +103,13 @@ function isHttpUrl(value) {
   } catch {
     return false;
   }
+}
+
+function weatherInfo(code, isDay = 1) {
+  const [desc, emoji] = WEATHER_CODES[code] ?? ["Condición desconocida", "🌡️"];
+  if (!isDay && (code === 0 || code === 1)) return [desc, "🌙"];
+  if (!isDay && code === 2) return [desc, "☁️"];
+  return [desc, emoji];
 }
 
 function round(value, suffix = "") {
@@ -157,9 +167,42 @@ function errorMessage(text) {
   return h("p", { class: "panel-message", role: "alert" }, warningIcon(), h("span", { text }), retryButton());
 }
 
-function renderWeather(data) {
+function renderHours(data) {
+  const hourly = data.hourly;
+  if (!hourly?.time?.length) return null;
+  const nowHour = `${data.current.time.slice(0, 13)}:00`;
+  const items = [];
+  hourly.time.forEach((time, i) => {
+    if (time < nowHour) return;
+    const [desc, emoji] = weatherInfo(hourly.weather_code[i], hourly.is_day?.[i]);
+    items.push(
+      h(
+        "li",
+        { class: "hour" },
+        h("span", { class: "hour-time", text: items.length === 0 ? "Ahora" : time.slice(11, 16) }),
+        h("span", { class: "hour-icon", role: "img", "aria-label": desc, text: emoji }),
+        h("span", { class: "hour-temp", text: round(hourly.temperature_2m[i], "°") }),
+        h(
+          "span",
+          { class: "hour-rain" },
+          h("span", { class: "sr-only", text: "Lluvia " }),
+          round(hourly.precipitation_probability[i], "%")
+        )
+      )
+    );
+  });
+  if (!items.length) return null;
+  return h(
+    "div",
+    { class: "hours-wrap" },
+    h("h2", { class: "sub-title", text: "Hoy, hora a hora" }),
+    h("ol", { class: "hours", tabindex: "0", role: "region", "aria-label": "Evolución por horas, desplázate para ver más" }, ...items)
+  );
+}
+
+function renderToday(data) {
   const { current, daily } = data;
-  const [desc, emoji] = WEATHER_CODES[current.weather_code] ?? ["Condición desconocida", "🌡️"];
+  const [desc, emoji] = weatherInfo(current.weather_code);
   const sunrise = daily.sunrise?.[0]?.slice(11, 16) ?? "N/D";
   const sunset = daily.sunset?.[0]?.slice(11, 16) ?? "N/D";
   const stat = (label, value) => h("div", {}, h("dt", { text: label }), h("dd", { text: value }));
@@ -185,6 +228,7 @@ function renderWeather(data) {
       stat("Viento", round(current.wind_speed_10m, " km/h")),
       stat("Amanece / anochece", `${sunrise} · ${sunset}`)
     ),
+    renderHours(data),
     h(
       "p",
       { class: "advice" },
@@ -197,6 +241,78 @@ function renderWeather(data) {
     )
   );
   els.weather.setAttribute("aria-busy", "false");
+}
+
+function dayLabel(date, index) {
+  if (index === 0) return "Hoy";
+  if (index === 1) return "Mañana";
+  return weekdayFormatter.format(new Date(`${date}T12:00:00Z`)).replace(".", "");
+}
+
+function renderWeek(daily) {
+  if (!daily?.time?.length) {
+    els.week.hidden = true;
+    return;
+  }
+  // Escala común para toda la semana: las barras son comparables entre días.
+  const lo = Math.min(...daily.temperature_2m_min);
+  const hi = Math.max(...daily.temperature_2m_max);
+  const span = Math.max(hi - lo, 1);
+
+  const rows = daily.time.map((date, i) => {
+    const [desc, emoji] = weatherInfo(daily.weather_code[i]);
+    const min = daily.temperature_2m_min[i];
+    const max = daily.temperature_2m_max[i];
+    const rain = daily.precipitation_probability_max[i];
+    const mm = daily.precipitation_sum?.[i];
+    const wind = daily.wind_speed_10m_max?.[i];
+
+    const range = h("span", { class: "range", "aria-hidden": "true" }, h("span", { class: "range-fill" }));
+    range.style.setProperty("--l", `${(((min - lo) / span) * 100).toFixed(1)}%`);
+    range.style.setProperty("--w", `${(((max - min) / span) * 100).toFixed(1)}%`);
+
+    return h(
+      "li",
+      { class: "day" },
+      h(
+        "span",
+        { class: "day-name" },
+        dayLabel(date, i),
+        wind >= 30 ? h("span", { class: "day-note", text: `viento ${Math.round(wind)} km/h` }) : null
+      ),
+      h("span", { class: "day-icon", role: "img", "aria-label": desc, text: emoji }),
+      h(
+        "span",
+        { class: "day-rain" },
+        h("span", { class: "sr-only", text: "Lluvia " }),
+        round(rain, "%"),
+        mm >= 0.1 ? h("span", { class: "day-mm", text: `${mmFormatter.format(mm)} mm` }) : null
+      ),
+      h("span", { class: "day-min" }, h("span", { class: "sr-only", text: "Mínima " }), round(min, "°")),
+      range,
+      h("span", { class: "day-max" }, h("span", { class: "sr-only", text: "Máxima " }), round(max, "°"))
+    );
+  });
+
+  els.week.replaceChildren(h("h2", { id: "week-title", text: "Próximos 7 días" }), h("ul", { class: "days" }, ...rows));
+  els.week.setAttribute("aria-labelledby", "week-title");
+  els.week.removeAttribute("aria-label");
+  els.week.setAttribute("aria-busy", "false");
+  els.week.hidden = false;
+}
+
+function renderWeather(data) {
+  renderToday(data);
+  renderWeek(data.daily);
+}
+
+function renderWeekSkeleton() {
+  const row = () => h("li", { class: "day" }, h("span", { class: "skeleton sk-line sk-day" }));
+  els.week.replaceChildren(
+    h("span", { class: "skeleton sk-title" }),
+    h("ul", { class: "days", "aria-hidden": "true" }, row(), row(), row(), row(), row(), row(), row())
+  );
+  els.week.hidden = false;
 }
 
 function renderNewsItem(item, index, order) {
@@ -292,6 +408,7 @@ const sections = {
     renderError: () => {
       els.weather.replaceChildren(errorMessage("No se pudo cargar el clima de Madrid."));
       els.weather.setAttribute("aria-busy", "false");
+      els.week.hidden = true;
     },
   },
   news: {
@@ -386,4 +503,5 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("online", () => refreshAll({ fresh: true }));
 
 renderNewsSkeleton();
+renderWeekSkeleton();
 refreshAll();

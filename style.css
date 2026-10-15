@@ -470,6 +470,149 @@ a {
   margin: 0 6px;
 }
 
+/* Pronóstico: franja por horas (dentro de la tarjeta del clima) y lista de 7 días */
+
+.hours-wrap {
+  margin-top: 20px;
+}
+
+.sub-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.hours {
+  display: flex;
+  gap: 8px;
+  margin: 0 -24px;
+  padding: 4px 24px 8px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  contain: paint;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.hour {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 64px;
+  padding: 10px 8px;
+  background: rgb(29 168 81 / 0.08);
+  border-radius: var(--radius-inner);
+  scroll-snap-align: start;
+  font-variant-numeric: tabular-nums;
+}
+
+.hour-time {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.hour-icon {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.hour-temp {
+  font-weight: 600;
+}
+
+.hour-rain {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.days {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.day {
+  display: grid;
+  grid-template-columns: 4.4rem 1.75rem 3.1rem 2.1rem minmax(48px, 1fr) 2.1rem;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.day:first-child {
+  border-top: none;
+}
+
+.day-name {
+  display: grid;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.day-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.day-icon {
+  font-size: 22px;
+  line-height: 1;
+  text-align: center;
+}
+
+.day-rain {
+  display: grid;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.day-mm {
+  font-size: 11px;
+}
+
+.day-min {
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.day-max {
+  font-weight: 600;
+}
+
+.range {
+  position: relative;
+  height: 6px;
+  background: var(--skeleton);
+  border-radius: 999px;
+}
+
+.range-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--l);
+  width: var(--w);
+  min-width: 8px;
+  background: var(--accent-text);
+  border-radius: 999px;
+}
+
+.sk-day {
+  grid-column: 1 / -1;
+  height: 22px;
+  margin: 0;
+}
+
 /* Carga, vacío y error */
 
 .skeleton {
@@ -645,6 +788,10 @@ a {
     animation: none;
   }
 
+  .hours {
+    scroll-behavior: auto;
+  }
+
   .btn,
   .news-link,
   .news-item,
@@ -664,5 +811,16 @@ a {
 @media (max-width: 480px) {
   .card {
     padding: 20px;
+  }
+
+  .hours {
+    margin: 0 -20px;
+    padding-inline: 20px;
+    scroll-padding-inline: 20px;
+  }
+
+  .day {
+    grid-template-columns: 3.9rem 1.6rem 2.7rem 1.9rem minmax(40px, 1fr) 1.9rem;
+    gap: 6px;
   }
 }
