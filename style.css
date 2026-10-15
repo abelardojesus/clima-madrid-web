@@ -30,6 +30,7 @@
   --radius-card: 16px;
   --radius-inner: 12px;
   --thumb: 76px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -66,6 +67,7 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
 }
 
 a {
@@ -110,6 +112,9 @@ a {
   margin: 0 auto;
   padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
     calc(48px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
 }
 
 .muted {
@@ -117,17 +122,9 @@ a {
   margin: 0;
 }
 
-/* Cabecera */
+/* Cabecera: el título grande sale con el scroll; la barra con "Actualizar" queda fija */
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.header h1 {
+.header-text h1 {
   margin: 0 0 4px;
   font-size: clamp(1.75rem, 6vw, 2.25rem);
   font-weight: 650;
@@ -136,10 +133,69 @@ a {
   text-wrap: balance;
 }
 
-.header-actions {
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: start;
+  isolation: isolate;
+  margin-top: 12px;
+}
+
+.bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 calc(50% - 50vw);
+  z-index: -1;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.bar-inner {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 8px 0;
+}
+
+.bar-title {
+  position: absolute;
+  right: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 359px) {
+  .bar-title {
+    display: none;
+  }
+}
+
+@media (min-width: 720px) {
+  .header-text,
+  .bar {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .bar {
+    margin-top: 0;
+  }
+
+  .bar-inner {
+    justify-content: flex-end;
+  }
+
+  .bar-title {
+    right: auto;
+    left: 0;
+  }
 }
 
 .status {
@@ -303,8 +359,32 @@ a {
   padding: 14px 0;
   border-top: 1px solid var(--border);
   border-radius: var(--radius-inner);
-  animation: fade-in 0.25s ease-out both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+  isolation: isolate;
+  touch-action: manipulation;
+  transition: transform 0.16s var(--ease-out);
+}
+
+.news-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 -8px;
+  z-index: -1;
+  border-radius: var(--radius-inner);
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s var(--ease-out);
+}
+
+/* Al tocar responde al instante (0 ms) y se recupera suave al soltar */
+.news-item:active {
+  transform: scale(0.985);
+  transition-duration: 0s;
+}
+
+.news-item:active::before {
+  opacity: 0.12;
+  transition-duration: 0s;
 }
 
 .news-item:first-child {
@@ -324,10 +404,17 @@ a {
   background: var(--skeleton);
   border: 1px solid var(--border);
   border-radius: var(--radius-inner);
+  transition: transform 0.15s var(--ease-out);
 }
 
 .news-item.no-image .news-thumb {
   display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .news-item:hover .news-thumb {
+    transform: scale(1.04);
+  }
 }
 
 .news-text {
@@ -477,7 +564,22 @@ a {
   }
 }
 
-@keyframes fade-in {
+/* Movimiento guiado por el scroll (sin JS). Sin soporte, todo queda visible y en su estado final. */
+
+@keyframes board-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes bar-bg-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes bar-title-in {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -488,25 +590,79 @@ a {
   }
 }
 
+@keyframes status-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@supports (animation-timeline: view()) and (timeline-scope: --hdr) {
+  @media (prefers-reduced-motion: no-preference) {
+    .page {
+      timeline-scope: --hdr;
+    }
+
+    .header-text {
+      view-timeline: --hdr block;
+    }
+
+    /* Cada tablón aparece mientras entra en pantalla: el scroll es el reloj, sin curva ni duración */
+    .board {
+      animation: board-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 240px;
+    }
+
+    /* La barra se vuelve compacta mientras el título grande sale de la pantalla */
+    .bar::before {
+      box-shadow: 0 1px 0 var(--border);
+      animation: bar-bg-in linear both;
+      animation-timeline: --hdr;
+      animation-range: exit 55% exit 100%;
+    }
+
+    .bar-title {
+      animation: bar-title-in linear both;
+      animation-timeline: --hdr;
+      animation-range: exit 70% exit 100%;
+    }
+
+    .status:not([data-state="error"]) {
+      animation: status-out linear both;
+      animation-timeline: --hdr;
+      animation-range: exit 55% exit 100%;
+    }
+
+    .bar:has(.status[data-state="error"]) .bar-title {
+      display: none;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
-  .news-item,
   .btn[disabled] .icon {
     animation: none;
   }
 
   .btn,
-  .news-link {
+  .news-link,
+  .news-item,
+  .news-thumb {
     transition: none;
+  }
+
+  .news-item:active {
+    transform: none;
+  }
+
+  .news-item:hover .news-thumb {
+    transform: none;
   }
 }
 
 @media (max-width: 480px) {
   .card {
     padding: 20px;
-  }
-
-  .header-actions {
-    width: 100%;
   }
 }

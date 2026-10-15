@@ -41,6 +41,7 @@ const WARNING_ICON_PATH =
 const els = {
   greeting: document.getElementById("greeting"),
   datetime: document.getElementById("datetime"),
+  barTitle: document.getElementById("bar-title"),
   status: document.getElementById("status"),
   refresh: document.getElementById("refresh"),
   weather: document.getElementById("weather-card"),
@@ -135,6 +136,7 @@ function relativeTime(iso) {
 function renderHeader() {
   const now = new Date();
   els.greeting.textContent = `${greeting(Number(hourFormatter.format(now)))}, Madrid`;
+  els.barTitle.textContent = els.greeting.textContent;
   const date = dateFormatter.format(now);
   els.datetime.textContent = date.charAt(0).toUpperCase() + date.slice(1);
 }
