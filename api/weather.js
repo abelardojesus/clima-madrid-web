@@ -10,14 +10,15 @@ export default async function handler(req, res) {
     "&timezone=Europe%2FMadrid";
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
     if (!response.ok) {
       throw new Error(`Open-Meteo respondió ${response.status}`);
     }
     const data = await response.json();
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+    res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=60");
     res.status(200).json(data);
   } catch (error) {
+    res.setHeader("Cache-Control", "no-store");
     res.status(502).json({ error: "No se pudo obtener el clima" });
   }
 }

@@ -2,26 +2,51 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Clima Madrid</title>
+<meta name="description" content="El tiempo en Madrid y los titulares del día: guerra y defensa, Venezuela, España y el mundo." />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#eef7f0" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0b1710" media="(prefers-color-scheme: dark)" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <a class="skip-link" href="#news">Saltar a las noticias</a>
+
   <main class="page">
     <header class="header">
-      <h1 id="greeting">Cargando…</h1>
-      <p id="datetime" class="muted"></p>
+      <div class="header-text">
+        <h1 id="greeting">Clima Madrid</h1>
+        <p id="datetime" class="muted"></p>
+      </div>
+      <div class="header-actions">
+        <button id="refresh" class="btn" type="button">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" focusable="false"><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/></svg>
+          <span>Actualizar</span>
+        </button>
+        <p id="status" class="status" role="status" aria-live="polite">Cargando…</p>
+      </div>
     </header>
 
-    <div id="last-updated" class="update-badge">🕒 Actualizando…</div>
-
-    <section id="weather-card" class="card weather-card">
-      <p class="muted">Cargando el clima de Madrid…</p>
+    <section id="weather-card" class="card weather" aria-label="El tiempo en Madrid" aria-busy="true">
+      <div class="skeleton-block" aria-hidden="true">
+        <span class="skeleton sk-temp"></span>
+        <span class="skeleton sk-line"></span>
+        <span class="skeleton sk-line sk-short"></span>
+      </div>
     </section>
 
-    <section id="recommendation" class="card recommendation-card" hidden></section>
+    <section id="news" class="news-grid" aria-label="Noticias" aria-busy="true"></section>
 
-    <section id="news" class="news-grid"></section>
+    <noscript><p class="notice">Esta página necesita JavaScript para mostrar el clima y las noticias.</p></noscript>
+
+    <footer class="footer">
+      <p>Clima: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>. Los titulares y las fotos pertenecen a cada medio.</p>
+    </footer>
   </main>
 
   <script src="/script.js"></script>

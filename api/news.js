@@ -1,35 +1,49 @@
 import Parser from "rss-parser";
 
-const NEWS_FEEDS = {
-  "Venezuela": [
-    { name: "Crónica Uno", url: "https://cronica.uno/feed/" },
-    { name: "Efecto Cocuyo", url: "https://efectococuyo.com/feed/" },
-  ],
-  "España": [
-    { name: "ABC", url: "https://www.abc.es/rss/2.0/portada/" },
-    { name: "20minutos", url: "https://www.20minutos.es/rss/madrid/" },
-  ],
-  "Mundo": [
-    { name: "BBC Mundo", url: "https://feeds.bbci.co.uk/mundo/rss.xml" },
-    { name: "France24", url: "https://www.france24.com/es/rss" },
-  ],
-};
+const PER_BOARD = 5;
+const FEED_TIMEOUT_MS = 6000;
+const OG_IMAGE_TIMEOUT_MS = 2500;
 
-// Fuente dedicada a industria y desarrollo militar (todo su contenido es
-// relevante). Las fuentes generalistas aportan la actualidad bélica
-// (Ucrania, Irán, etc.) pero se filtran por palabra clave para no mezclar
-// noticias ajenas al tablón.
-const WAR_PRIMARY_FEED = { name: "Infodefensa", url: "https://www.infodefensa.com/feed/all" };
-const WAR_FILTERED_FEEDS = [
-  { name: "ABC", url: "https://www.abc.es/rss/2.0/internacional/" },
-  { name: "BBC Mundo", url: "https://feeds.bbci.co.uk/mundo/rss.xml" },
-];
+// Guerra y Defensa mezcla una fuente especializada (todo su contenido es relevante)
+// con fuentes generalistas filtradas por palabra clave.
 const WAR_KEYWORDS =
   /\b(guerra\w*|ucrania\w*|rusia\w*|ruso\w*|kremlin\w*|putin\w*|zelensk\w*|ir[aá]n\w*|israel\w*|gaza\w*|hamas\w*|hamás\w*|hezbol\w*|otan|nato|misil\w*|dron\w*|militar\w*|ej[eé]rcito\w*|tropas\w*|armamento\w*|defensa\w*|nuclear\w*|b[eé]lic\w*|ofensiva\w*|bombarde\w*|invasi[oó]n\w*)\b/i;
 
-const PER_CATEGORY = 5;
+// El orden de este array es el orden de los tablones en la web.
+const BOARDS = [
+  {
+    title: "Guerra y Defensa",
+    sources: [
+      { name: "Infodefensa", url: "https://www.infodefensa.com/feed/all" },
+      { name: "ABC", url: "https://www.abc.es/rss/2.0/internacional/", filter: WAR_KEYWORDS },
+      { name: "BBC Mundo", url: "https://feeds.bbci.co.uk/mundo/rss.xml", filter: WAR_KEYWORDS },
+    ],
+  },
+  {
+    title: "Venezuela",
+    sources: [
+      { name: "Crónica Uno", url: "https://cronica.uno/feed/" },
+      { name: "Efecto Cocuyo", url: "https://efectococuyo.com/feed/" },
+    ],
+  },
+  {
+    title: "España",
+    sources: [
+      { name: "ABC", url: "https://www.abc.es/rss/2.0/portada/" },
+      { name: "20minutos", url: "https://www.20minutos.es/rss/madrid/" },
+    ],
+  },
+  {
+    title: "Mundo",
+    sources: [
+      { name: "BBC Mundo", url: "https://feeds.bbci.co.uk/mundo/rss.xml" },
+      { name: "France24", url: "https://www.france24.com/es/rss" },
+    ],
+  },
+];
+
 const parser = new Parser({
-  timeout: 8000,
+  timeout: FEED_TIMEOUT_MS,
   customFields: {
     item: [
       ["media:content", "mediaContent", { keepArray: true }],
@@ -37,6 +51,19 @@ const parser = new Parser({
     ],
   },
 });
+
+// Los feeds son contenido no confiable: solo se aceptan URLs http(s) y las imágenes se fuerzan a https.
+function httpUrl(value, { base, upgrade = false } = {}) {
+  if (!value) return null;
+  try {
+    const url = new URL(value, base);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (upgrade) url.protocol = "https:";
+    return url.href;
+  } catch {
+    return null;
+  }
+}
 
 function extractImage(entry) {
   if (entry.enclosure?.url && (entry.enclosure.type || "").startsWith("image")) {
@@ -50,97 +77,96 @@ function extractImage(entry) {
 
   const html = entry["content:encoded"] || entry.content || entry.summary || "";
   const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (match) return match[1];
-
-  return null;
+  return match ? match[1] : null;
 }
 
 async function fetchOgImage(link) {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(link, {
-      signal: controller.signal,
+      signal: AbortSignal.timeout(OG_IMAGE_TIMEOUT_MS),
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ClimaMadridBot/1.0)" },
     });
-    clearTimeout(timeout);
     if (!response.ok) return null;
     const html = await response.text();
     const match =
       html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
       html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
       html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-    return match ? match[1] : null;
-  } catch (error) {
+    return httpUrl(match?.[1], { base: link, upgrade: true });
+  } catch {
     return null;
   }
 }
 
-async function fetchSource({ name, url }) {
+async function fetchFeed(url) {
   try {
     const feed = await parser.parseURL(url);
     return feed.items
       .map((entry) => {
-        const title = (entry.title || "").trim();
+        const title = (entry.title || "").replace(/\s+/g, " ").trim();
         if (!title) return null;
-        return { title, source: name, link: entry.link || null, image: extractImage(entry) };
+        const link = httpUrl(entry.link);
+        const published = entry.isoDate && !Number.isNaN(Date.parse(entry.isoDate)) ? entry.isoDate : null;
+        return {
+          title,
+          link,
+          image: httpUrl(extractImage(entry), { base: link || url, upgrade: true }),
+          published,
+        };
       })
       .filter(Boolean);
-  } catch (error) {
+  } catch {
     return [];
   }
 }
 
-// Intercala las fuentes en vez de agotar la primera: así una fuente sin
-// imágenes en su feed (p. ej. bloqueada por Cloudflare al pedir la imagen
-// og:image) no acapara la categoría entera dejándola sin fotos.
-function interleave(lists) {
+// Intercala las fuentes para que ninguna acapare el tablón, y salta lo ya usado en otro tablón.
+function interleave(lists, used) {
   const items = [];
-  for (let i = 0; items.length < PER_CATEGORY && lists.some((list) => i < list.length); i++) {
+  const key = (item) => item.link || item.title;
+  for (let i = 0; items.length < PER_BOARD && lists.some((list) => i < list.length); i++) {
     for (const list of lists) {
-      if (items.length >= PER_CATEGORY) break;
-      if (list[i]) items.push(list[i]);
+      if (items.length >= PER_BOARD) break;
+      const item = list[i];
+      if (!item || used.has(key(item))) continue;
+      used.add(key(item));
+      items.push(item);
     }
   }
   return items;
 }
 
-async function fetchCategory(sources) {
-  const perSource = await Promise.all(sources.map(fetchSource));
-  return interleave(perSource);
-}
+async function buildNews() {
+  const urls = [...new Set(BOARDS.flatMap((board) => board.sources.map((source) => source.url)))];
+  const feeds = new Map(await Promise.all(urls.map(async (url) => [url, await fetchFeed(url)])));
 
-async function fetchWarCategory() {
-  const [primary, ...filteredRaw] = await Promise.all([
-    fetchSource(WAR_PRIMARY_FEED),
-    ...WAR_FILTERED_FEEDS.map(fetchSource),
-  ]);
-  const filtered = filteredRaw.map((list) => list.filter((item) => WAR_KEYWORDS.test(item.title)));
-  return interleave([primary, ...filtered]);
+  const used = new Set();
+  return BOARDS.map(({ title, sources }) => {
+    const perSource = sources.map(({ name, url, filter }) =>
+      feeds
+        .get(url)
+        .filter((item) => !filter || filter.test(item.title))
+        .map((item) => ({ ...item, source: name }))
+    );
+    return [title, interleave(perSource, used)];
+  });
 }
 
 export default async function handler(req, res) {
-  const categories = Object.keys(NEWS_FEEDS);
-  const results = await Promise.all([
-    ...categories.map((category) => fetchCategory(NEWS_FEEDS[category])),
-    fetchWarCategory(),
-  ]);
+  try {
+    const boards = await buildNews();
 
-  const news = {};
-  news["Guerra y Defensa"] = results[categories.length];
-  categories.forEach((category, i) => {
-    news[category] = results[i];
-  });
+    const missingImage = boards.flatMap(([, items]) => items).filter((item) => !item.image && item.link);
+    await Promise.all(
+      missingImage.map(async (item) => {
+        item.image = await fetchOgImage(item.link);
+      })
+    );
 
-  const missingImage = Object.values(news)
-    .flat()
-    .filter((item) => !item.image && item.link);
-  await Promise.all(
-    missingImage.map(async (item) => {
-      item.image = await fetchOgImage(item.link);
-    })
-  );
-
-  res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
-  res.status(200).json(news);
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
+    res.status(200).json(Object.fromEntries(boards));
+  } catch {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(502).json({ error: "No se pudieron obtener las noticias" });
+  }
 }
